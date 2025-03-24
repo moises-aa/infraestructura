@@ -1,0 +1,91 @@
+#!/bin/bash
+
+# Actualizar el sistema
+sudo apt-get update -y
+sudo apt-get upgrade -y
+
+# Instalar dependencias básicas
+sudo apt-get install -y curl wget git unzip
+
+# Configurar los discos duros de 1 TB
+# Asumiendo que los discos están identificados como /dev/sdb y /dev/sdc
+
+# Crear particiones en los discos
+echo -e "n\np\n1\n\n\nw" | sudo fdisk /dev/sdb
+echo -e "n\np\n1\n\n\nw" | sudo fdisk /dev/sdc
+
+# Formatear los discos con ext4
+sudo mkfs.ext4 /dev/sdb1
+sudo mkfs.ext4 /dev/sdc1
+
+# Crear puntos de montaje
+sudo mkdir -p /mnt/disco1
+sudo mkdir -p /mnt/disco2
+
+# Montar los discos
+sudo mount /dev/sdb1 /mnt/disco1
+sudo mount /dev/sdc1 /mnt/disco2
+
+# Agregar los discos al fstab para montaje automático en el arranque
+echo '/dev/sdb1 /mnt/disco1 ext4 defaults 0 0' | sudo tee -a /etc/fstab
+echo '/dev/sdc1 /mnt/disco2 ext4 defaults 0 0' | sudo tee -a /etc/fstab
+
+# Instalar WAMP Server
+sudo apt-get install -y apache2 mysql-server php libapache2-mod-php php-mysql
+
+# Habilitar módulos necesarios en Apache
+sudo a2enmod rewrite
+sudo systemctl restart apache2
+
+# Configurar MySQL
+sudo mysql_secure_installation
+
+# Instalar Composer (gestor de dependencias para PHP)
+php -r "copy('https://getcomposer.org/installer', 'composer-setup.php');"
+php composer-setup.php --install-dir=/usr/local/bin --filename=composer
+php -r "unlink('composer-setup.php');"
+
+# Instalar Node.js y npm para React Native
+curl -fsSL https://deb.nodesource.com/setup_16.x | sudo -E bash -
+sudo apt-get install -y nodejs
+
+# Instalar React Native CLI
+sudo npm install -g react-native-cli
+
+# Crear un directorio para la aplicación de e-commerce
+sudo mkdir -p /var/www/ecommerce
+sudo chown -R $USER:$USER /var/www/ecommerce
+cd /var/www/ecommerce
+
+# Clonar el repositorio de la aplicación (asumiendo que tienes un repositorio Git)
+# git clone https://github.com/tu-usuario/tu-repositorio.git .
+
+# Configurar Apache para servir la aplicación
+sudo tee /etc/apache2/sites-available/ecommerce.conf > /dev/null <<EOL
+<VirtualHost *:80>
+    DocumentRoot /var/www/ecommerce
+    ServerName ecommerce.local
+    <Directory /var/www/ecommerce>
+        Options Indexes FollowSymLinks
+        AllowOverride All
+        Require all granted
+    </Directory>
+    ErrorLog ${APACHE_LOG_DIR}/error.log
+    CustomLog ${APACHE_LOG_DIR}/access.log combined
+</VirtualHost>
+EOL
+
+# Habilitar el sitio y deshabilitar el sitio por defecto
+sudo a2ensite ecommerce.conf
+sudo a2dissite 000-default.conf
+sudo systemctl reload apache2
+
+# Configurar firewall (UFW)
+sudo ufw allow 80/tcp
+sudo ufw allow 22/tcp
+sudo ufw enable
+
+# Mensaje final
+echo "Configuración completada. La máquina virtual está lista para alojar la aplicación de e-commerce."
+echo "Accede a la aplicación en http://ecommerce.local"
+
